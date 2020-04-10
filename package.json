@@ -5,14 +5,24 @@
   "main": "index.js",
   "scripts": {
     "start": "pm2 start ecosystem.config.js",
-    "start:dev": "nodemon src/index.js",
+    "start:dev": "node src/brokermqtt.js && node src/index.js",
+    "start:local": "node src/brokermqtt.js & node src/index.js isLocal",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "actions-on-google": "^2.12.0",
+    "aedes": "^0.41.0",
+    "body-parser": "^1.19.0",
+    "cors": "^2.8.5",
     "express": "^4.17.1",
-    "nodemon": "^2.0.2"
+    "morgan": "^1.10.0",
+    "mqtt": "^3.0.0",
+    "net": "^1.0.2",
+    "ngrok": "^3.2.7",
+    "nodemon": "^2.0.2",
+    "util": "^0.12.2"
   }
 }
