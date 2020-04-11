@@ -18,6 +18,7 @@ process.argv.forEach((value) => {
 var useNgrok = ngrok;
 var expressPort = 3000;
 
+var device_status = new Map();
 
 // Client
 const SERVER = 'mqtt://localhost'
@@ -44,6 +45,7 @@ client.on(
   'message',
   (topic, message) => {
     log(`Message received on topic ${topic}: ${message.toString()}`)
+    device_status.set(topic, message)
   }
 )
 
@@ -132,9 +134,9 @@ appGoogle.onSync((body) => {
           'action.devices.traits.OnOff',
         ],
         name: {
-          defaultNames: ['LuzSalon1'],
-          name: 'LuzSalon2',
-          nicknames: ['LuzSalon3', 'Luz Salón4', 'Luz Salon5', 'Salon6'],
+          defaultNames: ['Luz Salón'],
+          name: 'Luz Salón',
+          nicknames: ['Luz Salón'],
         },
         deviceInfo: {
           manufacturer: 'ChavesJM CO',
@@ -148,14 +150,100 @@ appGoogle.onSync((body) => {
   };
 });
 
+function updateDevice(execution,deviceId){
+  
+	const {params,command} = execution;
+  	let state, ref;
+  	switch (command) {
+    		case 'action.devices.commands.OnOff':
+      			state = {on: params.on};
+			if(params.on === true){
+	      			console.log("updateDevice() - Turn ON")
+				client.publish(deviceId, '1');
+			}
+			else{
+				console.log("updateDevice() - Turn OFF")
+				client.publish(deviceId, '0');
+			}
+      		break;
+    		case 'action.devices.commands.StartStop':
+      			state = {isRunning: params.start};
+      		break;
+    		case 'action.devices.commands.PauseUnpause':
+      			state = {isPaused: params.pause};
+      		break;
+  	}
+
+  	return state;
+};
+
+
+
 appGoogle.onExecute(async (body) => {
 	console.log("Google - OnExecute - enter")
 	console.log(body)
+
+	const {requestId} = body;
+  	// Execution results are grouped by status
+  	const result = {
+    		ids: [],
+    		status: 'SUCCESS',
+    		states: {
+      		online: true,
+    		},
+  	};
+
+  	const executePromises = [];
+  	const intent = body.inputs[0];
+
+  	for (const command of intent.payload.commands) {
+    		for (const device of command.devices) {
+      			for (const execution of command.execution) {
+				console.log("Google - OnExecute - Execution: " + execution.command)
+				console.log("Google - OnExecute - Device: " + device.id)
+				result.ids.push(device.id)
+				result.states = updateDevice(execution, device.id)
+      }
+    }
+  }
+
+  return {
+    requestId: requestId,
+    payload: {
+      commands: [result],
+    },
+  };	
 });
+
+function queryDevice(deviceId){
+   aux = device_status.has(deviceId)
+   enable = aux ? device_status[deviceId]:0
+   isOnline = aux ? true:false
+   return {
+     on: enable == 0 ? false:true,
+     online: isOnline,
+   };
+}
 
 appGoogle.onQuery(async (body) => {
 	console.log("Google - OnQuery - enter")
 	console.log(body)
+
+	const {requestId} = body;	
+  	const {devices} = body.inputs[0].payload
+	const payload = {
+                devices: {},
+        };
+	for (const device of devices){
+		console.log("Google - OnQuery - DeviceId: " + device.id)
+		payload.devices[device.id] = queryDevice(device.id);		
+	}
+
+	console.log("Google - OnQuery - Payload: " + payload)
+	return {
+    		requestId: requestId,
+    		payload: payload,
+  	};
 });
 
 app.post('/smarthome', appGoogle)
